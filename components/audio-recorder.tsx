@@ -44,7 +44,8 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   const [playbackTime, setPlaybackTime] = useState(0)
   const [audioDuration, setAudioDuration] = useState(0)
   const [isMonitoring, setIsMonitoring] = useState(true)
-  const [recordingDuration, setRecordingDuration] = useState(10) // Default to 30 seconds
+  const [recordingDuration, setRecordingDuration] = useState(5)
+  const [isNoiseReduingProcessing, setIsNoiseReducingProcessing] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -139,7 +140,69 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
     }
   }, [recordedAudioUrl])
 
+  // Noise reduction function
+  const reduceNoise = async (file: File) => {
+    setIsNoiseReducingProcessing(true)
 
+    // get the noise file from the audio file with error handling
+    const noiseFile = new File([file], "./noise/noise.wav", { type: "audio/wav" })
+    if (!noiseFile) {
+      toast({
+        title: "Noise Reduction Error",
+        description: "No noise file provided for noise reduction.",
+        variant: "destructive",
+      })
+      setIsNoiseReducingProcessing(false)
+      return
+    }
+  
+    if(!file) {
+      toast({
+        title: "Noise Reduction Error",
+        description: "No audio file provided for noise reduction.",
+        variant: "destructive",
+      })
+      setIsNoiseReducingProcessing(false)
+      return
+    }
+
+    try {
+      // Create FormData to send the file
+      const formData = new FormData()
+      formData.append("noise_only", noiseFile)
+      formData.append("heart_noisy", file)
+
+      // API call to AWS Lambda using Axios
+      // const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reduce-noise`, formData, {
+      //   headers: {
+      //       'Accept': 'application/json',
+      //       'Content-Type': 'multipart/form-data',
+      //   },
+      // })
+
+      // if (response.status !== 200) {
+      //   throw new Error(`Server responded with status: ${response.status}`);
+      // }
+
+      // const data = response.data;
+
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+
+    } catch (error) {
+      console.error("Error reducing noise:", error)
+      toast({
+        title: "Noise Reduction Error",
+        description: "There was an error reducing noise. Please try again.",
+        variant: "destructive",
+      })
+    }
+    finally {
+      setIsNoiseReducingProcessing(false)
+    }
+  }
+
+  // Cleanup function to stop all resources
   const cleanupResources = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current)
@@ -285,14 +348,11 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
           const audioUrl = URL.createObjectURL(wavFile)
           setRecordedAudioUrl(audioUrl)
 
-          // if (audioElementRef.current) {
-          //   audioElementRef.current.src = audioUrl
-          //   audioElementRef.current.preload = "metadata"
-          //   audioElementRef.current.load()
-          // }
+          // Reduece the noise in the audio file
+          reduceNoise(wavFile)
 
           // Send the file to the parent component
-          onAudioCaptured(wavFile)
+          // onAudioCaptured(wavFile)
         } catch (error) {
           console.error("Error processing audio:", error)
           setRecordingError("There was an error processing your recording. Please try again.")
@@ -741,91 +801,114 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
 
   return (
     <div className="flex flex-col items-center space-y-4 w-full">
-      {/* Settings row */}
-      <div className="w-full flex flex-wrap items-center justify-between gap-2 mb-1">
-        {/* Duration selector */}
-        <div className="flex items-center gap-2">
-          <Label htmlFor="duration-select" className="text-xs flex items-center gap-1">
-            <Clock className="h-3 w-3 text-muted-foreground" />
-            Auto-stop after
-          </Label>
-          <Select
-            value={recordingDuration.toString()}
-            onValueChange={handleDurationChange}
-            disabled={isRecording || isProcessing}
-          >
-            <SelectTrigger id="duration-select" className="h-8 w-[130px]">
-              <SelectValue placeholder="Select duration" />
-            </SelectTrigger>
-            <SelectContent>
-              {RECORDING_DURATIONS.map((duration) => (
-                <SelectItem key={duration.value} value={duration.value.toString()}>
-                  {duration.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
 
-        {/* Monitoring toggle */}
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="monitor-toggle" className="text-xs flex items-center gap-1 cursor-pointer">
-            {isMonitoring ? (
-              <Headphones className="h-3 w-3 text-primary" />
-            ) : (
-              <HeadphonesOff className="h-3 w-3 text-muted-foreground" />
-            )}
-            Monitor Audio
-          </Label>
-          <Switch
-            id="monitor-toggle"
-            checked={isMonitoring}
-            onCheckedChange={toggleMonitoring}
-            aria-label="Toggle audio monitoring"
-          />
+      {/* Noise reduction processing indicator */}
+      {isNoiseReduingProcessing && (
+        <div className="w-full p-2 bg-muted/10 border border-muted/30 rounded-md text-muted-foreground text-sm flex items-center gap-2">
+          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-primary"></div>
+          <p>Denoising...</p>
         </div>
-      </div>
+      )}
+
+      {/* Animated noise reduction visualization */}
+      {isNoiseReduingProcessing && (
+        <div className="w-full h-40 mt-2 bg-muted/10 border border-muted/30 rounded-md overflow-hidden relative">
+          <div className="absolute inset-0 flex items-center justify-center">
+        <p className="text-muted-foreground text-lg">Processing...</p>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/30 via-primary/50 to-primary/30 animate-pulse"></div>
+        </div>
+      )}
+
+
+      {/* Settings row */}
+      { !isNoiseReduingProcessing && (
+        <div className="w-full flex flex-wrap items-center justify-between gap-2 mb-1">
+          {/* Duration selector */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor="duration-select" className="text-xs flex items-center gap-1">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              Auto-stop after
+            </Label>
+            <Select
+              value={recordingDuration.toString()}
+              onValueChange={handleDurationChange}
+              disabled={isRecording || isProcessing}
+            >
+              <SelectTrigger id="duration-select" className="h-8 w-[130px]">
+                <SelectValue placeholder="Select duration" />
+              </SelectTrigger>
+              <SelectContent>
+                {RECORDING_DURATIONS.map((duration) => (
+                  <SelectItem key={duration.value} value={duration.value.toString()}>
+                    {duration.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Monitoring toggle */}
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="monitor-toggle" className="text-xs flex items-center gap-1 cursor-pointer">
+              {isMonitoring ? (
+                <Headphones className="h-3 w-3 text-primary" />
+              ) : (
+                <HeadphonesOff className="h-3 w-3 text-muted-foreground" />
+              )}
+              Monitor Audio
+            </Label>
+            <Switch
+              id="monitor-toggle"
+              checked={isMonitoring}
+              onCheckedChange={toggleMonitoring}
+              aria-label="Toggle audio monitoring"
+            />
+          </div>
+        </div>
+      )}
+
 
       {/* Waveform visualization */}
-      <div className="w-full h-40 rounded-md overflow-hidden bg-card relative shadow-md border border-border">
-        <canvas ref={canvasRef} height={160} className="w-full h-full" />
+      { !isNoiseReduingProcessing && (
+        <div className="w-full h-40 rounded-md overflow-hidden bg-card relative shadow-md border border-border">
+              <canvas ref={canvasRef} height={160} className="w-full h-full" />
 
-        {/* Medical grade indicator */}
-        <div className="absolute top-2 right-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
-          Medical-grade
+          {/* Medical grade indicator */}
+          <div className="absolute top-2 right-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
+            Medical-grade
+          </div>
+
+          {/* Recording time indicator */}
+          {isRecording && (
+            <div className="absolute bottom-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
+              {formatTime(recordingTime)} / {formatTime(recordingDuration)}
+            </div>
+          )}
+
+          {!isRecording && (
+            <div className="absolute bottom-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
+              {formatTime(playbackTime)} / {formatTime(audioDuration)}
+            </div>
+          )}
+
+          {/* Monitoring indicator */}
+          {isRecording && isMonitoring && (
+            <div className="absolute bottom-2 right-2 bg-primary/50 text-primary-foreground text-xs px-2 py-1 rounded-full flex items-center gap-1">
+              <Headphones className="h-3 w-3" />
+              Monitoring
+            </div>
+          )}
+
+          {/* Auto-stop indicator */}
+          {isRecording && (
+            <div className="absolute top-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Auto-stop: {formatTime(recordingDuration - recordingTime)}
+            </div>
+          )}
         </div>
-
-        {/* Recording time indicator */}
-        {isRecording && (
-          <div className="absolute bottom-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
-            {formatTime(recordingTime)} / {formatTime(recordingDuration)}
-          </div>
-        )}
-
-        {!isRecording && (
-          <div className="absolute bottom-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
-            {formatTime(playbackTime)} / {formatTime(audioDuration)}
-          </div>
-        )}
-
-        
-
-        {/* Monitoring indicator */}
-        {isRecording && isMonitoring && (
-          <div className="absolute bottom-2 right-2 bg-primary/50 text-primary-foreground text-xs px-2 py-1 rounded-full flex items-center gap-1">
-            <Headphones className="h-3 w-3" />
-            Monitoring
-          </div>
-        )}
-
-        {/* Auto-stop indicator */}
-        {isRecording && (
-          <div className="absolute top-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            Auto-stop: {formatTime(recordingDuration - recordingTime)}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Error message */}
       {recordingError && (
@@ -839,7 +922,7 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
         <div className="relative">
           <Button
             onClick={isRecording ? stopRecording : startRecording}
-            disabled={isProcessing}
+            disabled={isProcessing || isNoiseReduingProcessing}
             className={cn(
               "relative rounded-full w-16 h-16 p-0 transition-all shadow-md",
               isRecording ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90",
@@ -883,7 +966,7 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
         </div>
 
         {/* Playback and download controls */}
-        {recordedAudioUrl && !isRecording && !isProcessing && (
+        {recordedAudioUrl && !isRecording && !isProcessing && !isNoiseReduingProcessing && (
           <div className="flex gap-2">
             <Button
               onClick={togglePlayback}

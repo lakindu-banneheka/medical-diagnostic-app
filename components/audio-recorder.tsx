@@ -63,6 +63,8 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   const recordedAudioBlobRef = useRef<Blob | null>(null)
   const monitorNodeRef = useRef<GainNode | null>(null)
   const { theme } = useTheme()
+  // Store a static snapshot of the waveform image for playback indicator
+  const staticImageRef = useRef<ImageData | null>(null)
 
   const MAX_BUFFER_SIZE = 1024 * 200 // Increased buffer size for medical-grade precision
 
@@ -372,6 +374,11 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
           })
         } finally {
           setIsProcessing(false)
+          // Stop any ongoing recording waveform animation
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current)
+            animationFrameRef.current = null
+          }
         }
       }
 
@@ -651,6 +658,8 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
       ctx.lineTo(i, yHigh);
     }
     ctx.stroke();
+    // Capture static waveform image for playback indicator
+    staticImageRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   } catch (err) {
     console.error('Error drawing WAV file:', err);
@@ -777,6 +786,46 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
       window.removeEventListener("resize", handleResize)
     }
   }, [])
+
+  // Draw a playback progress indicator on canvas during audio playback
+  useEffect(() => {
+    let rafId: number
+    const drawPlaybackIndicator = () => {
+      if (!canvasRef.current || !audioElementRef.current || audioDuration === 0) {
+        rafId = requestAnimationFrame(drawPlaybackIndicator)
+        return
+      }
+      const canvas = canvasRef.current
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        rafId = requestAnimationFrame(drawPlaybackIndicator)
+        return
+      }
+      // Clear previous overlay and redraw static waveform
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      if (staticImageRef.current) {
+        ctx.putImageData(staticImageRef.current, 0, 0)
+      }
+      // Compute playback progress and x-position
+      const progress = audioElementRef.current.currentTime / audioDuration
+      const x = progress * canvas.width
+      ctx.save()
+      ctx.strokeStyle = theme === 'dark' ? '#FF4D4F' : '#D93025'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, canvas.height)
+      ctx.stroke()
+      ctx.restore()
+      rafId = requestAnimationFrame(drawPlaybackIndicator)
+    }
+    if (isPlaying) {
+      rafId = requestAnimationFrame(drawPlaybackIndicator)
+    }
+    return () => {
+      cancelAnimationFrame(rafId)
+    }
+  }, [isPlaying, audioDuration, theme, recordedAudioUrl])
 
   const togglePlayback = () => {
     if (!audioElementRef.current || !recordedAudioUrl) return

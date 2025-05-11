@@ -801,6 +801,8 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
         rafId = requestAnimationFrame(drawPlaybackIndicator)
         return
       }
+      // Reset any transforms so pixel drawing aligns
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
       // Clear previous overlay and redraw static waveform
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       if (staticImageRef.current) {

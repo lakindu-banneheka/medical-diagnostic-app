@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 import { useTheme } from "next-themes"
+import axios from "axios"
 
 export default function Home() {
   const [audioFile, setAudioFile] = useState<File | null>(null)
@@ -47,21 +48,19 @@ export default function Home() {
 
       // In a real application, you would send this to your AWS Lambda endpoint
       try {
-        // Simulate API call to AWS Lambda
-        // const response = await fetch('https://your-api-endpoint.com/analyze', {
-        //   method: 'POST',
-        //   body: formData,
+        // Simulate API call to AWS Lambda using Axios
+        // const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/predict`, formData, {
         //   headers: {
         //     'Accept': 'application/json',
+        //     'Content-Type': 'multipart/form-data',
         //   },
-        //   timeout: 30000, // 30 second timeout
         // });
 
-        // if (!response.ok) {
+        // if (response.status !== 200) {
         //   throw new Error(`Server responded with status: ${response.status}`);
         // }
 
-        // const data = await response.json();
+        // const data = response.data;
 
         // Simulate API call
         await new Promise((resolve) => setTimeout(resolve, 2000))

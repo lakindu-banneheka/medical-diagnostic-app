@@ -39,7 +39,6 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   const [recordingTime, setRecordingTime] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
-  const [downloadableAudioUrl, setDownloadableAudioUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [recordingError, setRecordingError] = useState<string | null>(null)
   const [playbackTime, setPlaybackTime] = useState(0)
@@ -130,6 +129,16 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
       }
     }
   }, [isMonitoring, isRecording])
+
+  // Update audio element source when recorded audio URL changes
+  useEffect(() => {
+    if (audioElementRef.current && recordedAudioUrl) {
+      audioElementRef.current.src = recordedAudioUrl
+      audioElementRef.current.preload = "metadata"
+      audioElementRef.current.load()
+    }
+  }, [recordedAudioUrl])
+
 
   const cleanupResources = () => {
     if (timerRef.current) {
@@ -267,29 +276,21 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
         try {
           // Create audio blob
           const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
-
-          
-
           recordedAudioBlobRef.current = audioBlob
-
-          // Create object URL for playback
-          const audioUrl = URL.createObjectURL(audioBlob)
-          setRecordedAudioUrl(audioUrl)
-
-          if (audioElementRef.current) {
-            audioElementRef.current.src = audioUrl
-            audioElementRef.current.preload = "metadata"
-            audioElementRef.current.load()
-          }
-              
-          // const wavFile = new File([audioBlob], "medical_recording.wav", {
-          //   type: "audio/wav",
-          //   lastModified: Date.now(),
-          // })
 
           // Create WAV file for analysis
           const wavFile = await blobToWavFile(audioBlob, 'medical_recording.wav');
-          setDownloadableAudioUrl(URL.createObjectURL(wavFile))
+          
+          // Create object URL for playback
+          const audioUrl = URL.createObjectURL(wavFile)
+          setRecordedAudioUrl(audioUrl)
+
+          // if (audioElementRef.current) {
+          //   audioElementRef.current.src = audioUrl
+          //   audioElementRef.current.preload = "metadata"
+          //   audioElementRef.current.load()
+          // }
+
           // Send the file to the parent component
           onAudioCaptured(wavFile)
         } catch (error) {
@@ -674,12 +675,12 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   }
 
   const downloadRecording = () => {
-    if (!downloadableAudioUrl || !recordedAudioBlobRef.current) return
+    if (!recordedAudioUrl) return
 
     try {
       // Create a download link
       const downloadLink = document.createElement("a")
-      downloadLink.href = downloadableAudioUrl
+      downloadLink.href = recordedAudioUrl
       downloadLink.download = `medical_recording_${new Date().toISOString().slice(0, 10)}.wav`
 
       // Append to the document, click it, and remove it
@@ -803,7 +804,7 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
 
         {!isRecording && (
           <div className="absolute bottom-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
-            {formatTime(playbackTime)} / {formatTime(recordingTime)}
+            {formatTime(playbackTime)} / {formatTime(audioDuration)}
           </div>
         )}
 

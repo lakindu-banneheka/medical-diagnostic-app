@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, use } from "react"
+import { useState, useRef, useEffect, useLayoutEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Mic,
@@ -19,8 +19,8 @@ import { useTheme } from "next-themes"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { WaveFile } from "wavefile";
 import { blobToWavFile } from "@/lib/wavEncoder"
+import { set } from "date-fns"
 
 interface AudioRecorderProps {
   onAudioCaptured: (file: File) => void
@@ -46,6 +46,7 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   const [isMonitoring, setIsMonitoring] = useState(true)
   const [recordingDuration, setRecordingDuration] = useState(5)
   const [isNoiseReduingProcessing, setIsNoiseReducingProcessing] = useState(false)
+  const [ canvasAudioFile, setCanvasAudioFile] = useState<File | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -187,7 +188,8 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
       // const data = response.data;
 
         await new Promise((resolve) => setTimeout(resolve, 2000))
-
+      // Render the denoised waveform on canvas
+      setCanvasAudioFile(file)
 
     } catch (error) {
       console.error("Error reducing noise:", error)
@@ -201,6 +203,13 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
       setIsNoiseReducingProcessing(false)
     }
   }
+
+  // Draw waveform from recorded audio File
+  useEffect(() => {
+    if(canvasRef.current && canvasAudioFile && !isNoiseReduingProcessing && !isRecording) {
+      drawWavFile(canvasAudioFile)
+    }
+  }, [canvasRef.current, canvasAudioFile]);
 
   // Cleanup function to stop all resources
   const cleanupResources = () => {
@@ -571,6 +580,89 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
     draw()
   }
 
+  // Draw waveform from WAV file
+  const drawWavFile = async (file: File) => {
+  if (!canvasRef.current) return;
+
+  // Create & resume audio context
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+  const audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
+
+  try {
+    // Read file into ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Decode WAV data, with Promise + callback fallback
+    let audioBuffer: AudioBuffer;
+    if (audioCtx.decodeAudioData.length === 1) {
+      // Promise-based
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    } else {
+      // Callback-based
+      audioBuffer = await new Promise((resolve, reject) => {
+        audioCtx.decodeAudioData(
+          arrayBuffer,
+          buffer => resolve(buffer),
+          err => reject(err)
+        );
+      });
+    }
+
+    // Extract mono data
+    const rawData = audioBuffer.getChannelData(0);
+
+    // Prepare canvas
+    const canvas = canvasRef.current!;
+    const containerWidth = canvas.parentElement?.clientWidth || canvas.width;
+    const height = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = containerWidth * dpr;
+    canvas.height = height * dpr;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    // Background
+    ctx.clearRect(0, 0, containerWidth, height);
+    ctx.fillStyle = theme === 'dark' ? '#1E1E1E' : '#F5F6FA';
+    ctx.fillRect(0, 0, containerWidth, height);
+
+    // Compute step (at least 1 sample per pixel)
+    const step = Math.max(Math.floor(rawData.length / containerWidth), 1);
+    const amp = height / 2;
+
+    // Draw waveform
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = theme === 'dark' ? '#AAAAAA' : '#4A90E2';
+    ctx.beginPath();
+    for (let i = 0; i < containerWidth; i++) {
+      let min = 1.0, max = -1.0;
+      for (let j = 0; j < step; j++) {
+        const datum = rawData[i * step + j];
+        if (datum < min) min = datum;
+        if (datum > max) max = datum;
+      }
+      const yLow = (1 + min) * amp;
+      const yHigh = (1 + max) * amp;
+      ctx.moveTo(i, yLow);
+      ctx.lineTo(i, yHigh);
+    }
+    ctx.stroke();
+
+  } catch (err) {
+    console.error('Error drawing WAV file:', err);
+    toast({
+      title: 'Waveform Error',
+      description: 'Could not render waveform. Please try again.',
+      variant: 'destructive',
+    });
+  }
+  };
+
+  // Draw detailed waveform with peaks and average lines
   const drawDetailedWaveform = (
     canvasCtx: CanvasRenderingContext2D,
     width: number,

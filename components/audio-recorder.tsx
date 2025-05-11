@@ -65,16 +65,6 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
 
   const MAX_BUFFER_SIZE = 1024 * 200 // Increased buffer size for medical-grade precision
 
-  // Testing 
-  console.log(audioDuration, playbackTime, recordingTime, isRecording, isProcessing)
-  console.log("AudioContext state:", audioContextRef.current?.state)
-  console.log("MediaRecorder state:", mediaRecorderRef.current?.state)
-  console.log("Stream active:", streamRef.current?.active)
-
-
-  
-
-
   // Initialize audio element
   useEffect(() => {
     audioElementRef.current = new Audio()
@@ -811,6 +801,12 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
           </div>
         )}
 
+        {!isRecording && (
+          <div className="absolute bottom-2 left-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
+            {formatTime(playbackTime)} / {formatTime(recordingTime)}
+          </div>
+        )}
+
         
 
         {/* Monitoring indicator */}
@@ -910,14 +906,6 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
           </div>
         )}
       </div>
-
-      {/* {recordedAudioUrl && (
-        <div className="flex flex-col items-center">
-          <span className="text-xs text-muted-foreground">
-            {formatTime(playbackTime)} / {formatTime(audioDuration)}
-          </span>
-        </div>
-      )} */}
     </div>
   )
 }

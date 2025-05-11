@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { toast } from "@/components/ui/use-toast"
 import { formatTime } from "@/utils/format-utils"
+import { blobToWavFile } from "@/utils/wav-encoder"
 
 interface UseAudioRecorderProps {
   onAudioCaptured: (file: File) => void
@@ -22,7 +23,11 @@ interface UseAudioRecorderReturn {
   stopRecording: () => void
   setRecordingDuration: (duration: number) => void
   cleanupResources: () => void
+  updateRecordedAudioUrl: (url: string | null) => void
 }
+
+// Define the sample rate as a constant
+const SAMPLE_RATE = 2000 // 2000Hz as requested
 
 export function useAudioRecorder({
   onAudioCaptured,
@@ -43,6 +48,29 @@ export function useAudioRecorder({
   const audioContextRef = useRef<AudioContext | null>(null)
   const recordingStartTimeRef = useRef<number | null>(null)
   const audioBufferRef = useRef<Float32Array[]>([])
+  const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const resamplerNodeRef = useRef<AudioWorkletNode | null>(null)
+  const audioElementRef = useRef<HTMLAudioElement | null>(null)
+  const recordedAudioBlobRef = useRef<Blob | null>(null)
+
+  // Create audio element for metadata extraction
+  useEffect(() => {
+    audioElementRef.current = new Audio()
+
+    // Listen for metadata to get accurate duration
+    audioElementRef.current.addEventListener("loadedmetadata", () => {
+      if (audioElementRef.current && audioElementRef.current.duration) {
+        setAudioDuration(audioElementRef.current.duration)
+      }
+    })
+
+    return () => {
+      if (audioElementRef.current) {
+        audioElementRef.current.src = ""
+        audioElementRef.current = null
+      }
+    }
+  }, [])
 
   // Clean up resources when component unmounts
   useEffect(() => {
@@ -176,10 +204,11 @@ export function useAudioRecorder({
 
   const startRecording = async () => {
     setRecordingError(null)
-    setRecordedAudioUrl(null)
+    updateRecordedAudioUrl(null)
     setRecordingTime(0)
     setAudioDuration(0)
     audioBufferRef.current = []
+    recordedAudioBlobRef.current = null
 
     try {
       // Clean up any existing resources first
@@ -191,32 +220,32 @@ export function useAudioRecorder({
       // Store the recording start time
       recordingStartTimeRef.current = Date.now()
 
-      // Get audio stream with high-quality settings for medical applications
+      // Get audio stream with settings for 2000Hz sampling
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: false, // Disable echo cancellation for medical accuracy
-          noiseSuppression: false, // Disable noise suppression to preserve all audio details
-          autoGainControl: false, // Disable auto gain to maintain consistent levels
-          sampleRate: 48000, // Higher sample rate for medical-grade audio
-          channelCount: 1, // Mono for simplicity and focus on respiratory sounds
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          // Note: Most browsers ignore sampleRate in constraints, but we'll set it anyway
+          sampleRate: SAMPLE_RATE,
+          channelCount: 1,
         },
       })
       streamRef.current = stream
 
-      // Set up audio context with high precision settings
+      // Set up audio context with 2000Hz sample rate
+      // Note: Browsers have minimum sample rates (usually 8000Hz), so we'll need to downsample
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-        sampleRate: 48000, // Higher sample rate for medical applications
+        // Use a standard sample rate for initial capture, we'll downsample later
+        sampleRate: 8000, // Minimum sample rate supported by most browsers
         latencyHint: "interactive",
       })
       audioContextRef.current = audioContext
 
-      // Create analyzer for visualization
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 4096
+      console.log(`Actual AudioContext sample rate: ${audioContext.sampleRate}Hz`)
 
       // Create source from stream
       const source = audioContext.createMediaStreamSource(stream)
-      source.connect(analyser)
 
       // Create script processor to capture audio data for visualization
       const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1)
@@ -238,13 +267,17 @@ export function useAudioRecorder({
       source.connect(scriptProcessor)
       scriptProcessor.connect(audioContext.destination)
 
-      // Set up media recorder with highest quality settings
+      // Set up media recorder with appropriate settings
       const options = {
         mimeType: "audio/webm;codecs=opus",
-        audioBitsPerSecond: 256000, // Higher bitrate for medical-grade audio
+        audioBitsPerSecond: 32000, // Lower bitrate for lower sample rate
       }
 
-      mediaRecorderRef.current = new MediaRecorder(stream, options)
+      // Create a MediaStream destination to record the processed audio
+      const destination = audioContext.createMediaStreamDestination()
+      source.connect(destination)
+
+      mediaRecorderRef.current = new MediaRecorder(destination.stream, options)
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -259,14 +292,6 @@ export function useAudioRecorder({
 
         // Ensure recording state is updated
         setIsRecording(false)
-
-        // Calculate actual recording duration if not already set
-        if (recordingStartTimeRef.current && audioDuration === 0) {
-          const recordingEndTime = Date.now()
-          const actualDuration = (recordingEndTime - recordingStartTimeRef.current) / 1000
-          console.log(`Actual recording duration: ${actualDuration} seconds`)
-          setAudioDuration(actualDuration)
-        }
 
         // Double-check that all tracks are stopped
         if (streamRef.current) {
@@ -290,15 +315,34 @@ export function useAudioRecorder({
           const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
           console.log(`Created audio blob of size: ${audioBlob.size} bytes`)
 
+          // Store the blob for later use
+          recordedAudioBlobRef.current = audioBlob
+
           // Create object URL for playback
           const audioUrl = URL.createObjectURL(audioBlob)
-          setRecordedAudioUrl(audioUrl)
+          updateRecordedAudioUrl(audioUrl)
+
+          // Load audio for metadata extraction
+          if (audioElementRef.current) {
+            audioElementRef.current.src = audioUrl
+            audioElementRef.current.preload = "metadata"
+            audioElementRef.current.load()
+          }
 
           // Make sure we have a valid duration
           const finalDuration = audioDuration > 0 ? audioDuration : recordingDuration
 
-          // Create WAV file with duration metadata
-          const wavFile = createWavFile(audioBlob, finalDuration)
+          // Create proper WAV file using the encoder
+          const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-")
+          const filename = `medical_recording_${timestamp}_${SAMPLE_RATE}Hz.wav`
+
+          // Convert to proper WAV format
+          const wavFile = await blobToWavFile(audioBlob, filename)
+
+          // Log file details
+          console.log(
+            `Created WAV file: ${filename}, size: ${wavFile.size} bytes, duration: ${finalDuration} seconds, sample rate: ${SAMPLE_RATE}Hz`,
+          )
 
           // Send the file to the parent component
           onAudioCaptured(wavFile)
@@ -363,10 +407,10 @@ export function useAudioRecorder({
         navigator.vibrate(100)
       }
 
-      // Notify user about auto-stop
+      // Notify user about auto-stop and sample rate
       toast({
         title: "Recording Started",
-        description: `Recording will automatically stop after ${formatTime(recordingDuration)}.`,
+        description: `Recording at ${SAMPLE_RATE}Hz. Will stop after ${formatTime(recordingDuration)}.`,
       })
     } catch (error) {
       console.error("Error starting recording:", error)
@@ -379,21 +423,12 @@ export function useAudioRecorder({
     }
   }
 
-  // Helper function to create a WAV file with proper duration metadata
-  const createWavFile = (audioBlob: Blob, duration: number): File => {
-    // Create a file with the current timestamp
-    const fileName = `medical_recording_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.wav`
-
-    // Create a file with additional properties
-    const file = new File([audioBlob], fileName, {
-      type: "audio/wav",
-      lastModified: Date.now(),
-    })
-
-    // Log file details
-    console.log(`Created WAV file: ${fileName}, size: ${file.size} bytes, duration: ${duration} seconds`)
-
-    return file
+  const updateRecordedAudioUrl = (url: string | null) => {
+    // If there's an existing URL, revoke it to prevent memory leaks
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl)
+    }
+    setRecordedAudioUrl(url)
   }
 
   return {
@@ -409,5 +444,6 @@ export function useAudioRecorder({
     stopRecording,
     setRecordingDuration,
     cleanupResources,
+    updateRecordedAudioUrl,
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, use } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Mic,
@@ -19,6 +19,8 @@ import { useTheme } from "next-themes"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { WaveFile } from "wavefile";
+import { blobToWavFile } from "@/lib/wavEncoder"
 
 interface AudioRecorderProps {
   onAudioCaptured: (file: File) => void
@@ -37,6 +39,7 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   const [recordingTime, setRecordingTime] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const [downloadableAudioUrl, setDownloadableAudioUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [recordingError, setRecordingError] = useState<string | null>(null)
   const [playbackTime, setPlaybackTime] = useState(0)
@@ -61,6 +64,16 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   const { theme } = useTheme()
 
   const MAX_BUFFER_SIZE = 1024 * 200 // Increased buffer size for medical-grade precision
+
+  // Testing 
+  console.log(audioDuration, playbackTime, recordingTime, isRecording, isProcessing)
+  console.log("AudioContext state:", audioContextRef.current?.state)
+  console.log("MediaRecorder state:", mediaRecorderRef.current?.state)
+  console.log("Stream active:", streamRef.current?.active)
+
+
+  
+
 
   // Initialize audio element
   useEffect(() => {
@@ -264,6 +277,9 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
         try {
           // Create audio blob
           const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
+
+          
+
           recordedAudioBlobRef.current = audioBlob
 
           // Create object URL for playback
@@ -272,16 +288,18 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
 
           if (audioElementRef.current) {
             audioElementRef.current.src = audioUrl
-            // Preload the audio to get duration
+            audioElementRef.current.preload = "metadata"
             audioElementRef.current.load()
           }
+              
+          // const wavFile = new File([audioBlob], "medical_recording.wav", {
+          //   type: "audio/wav",
+          //   lastModified: Date.now(),
+          // })
 
           // Create WAV file for analysis
-          const wavFile = new File([audioBlob], "medical_recording.wav", {
-            type: "audio/wav",
-            lastModified: Date.now(),
-          })
-
+          const wavFile = await blobToWavFile(audioBlob, 'medical_recording.wav');
+          setDownloadableAudioUrl(URL.createObjectURL(wavFile))
           // Send the file to the parent component
           onAudioCaptured(wavFile)
         } catch (error) {
@@ -666,12 +684,12 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   }
 
   const downloadRecording = () => {
-    if (!recordedAudioUrl || !recordedAudioBlobRef.current) return
+    if (!downloadableAudioUrl || !recordedAudioBlobRef.current) return
 
     try {
       // Create a download link
       const downloadLink = document.createElement("a")
-      downloadLink.href = recordedAudioUrl
+      downloadLink.href = downloadableAudioUrl
       downloadLink.download = `medical_recording_${new Date().toISOString().slice(0, 10)}.wav`
 
       // Append to the document, click it, and remove it
@@ -892,6 +910,14 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
           </div>
         )}
       </div>
+
+      {/* {recordedAudioUrl && (
+        <div className="flex flex-col items-center">
+          <span className="text-xs text-muted-foreground">
+            {formatTime(playbackTime)} / {formatTime(audioDuration)}
+          </span>
+        </div>
+      )} */}
     </div>
   )
 }

@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { blobToWavFile } from "@/lib/wavEncoder"
-import { set } from "date-fns"
+import axios from "axios"
 
 interface AudioRecorderProps {
   onAudioCaptured: (file: File) => void
@@ -176,22 +176,35 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
       formData.append("heart_noisy", file)
 
       // API call to AWS Lambda using Axios
-      // const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reduce-noise`, formData, {
-      //   headers: {
-      //       'Accept': 'application/json',
-      //       'Content-Type': 'multipart/form-data',
-      //   },
-      // })
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/noise-reduction`, formData, {
+        responseType: 'blob',     
+        headers: {
+            'Accept': 'audio/wav',
+            'Content-Type': 'multipart/form-data',
+        },
+      })
 
-      // if (response.status !== 200) {
-      //   throw new Error(`Server responded with status: ${response.status}`);
-      // }
+      if (response.status !== 200) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
 
-      // const data = response.data;
+      // Create a Blob from the response data
+      const wavBlob = new Blob([response.data as ArrayBuffer], { type: 'audio/wav' });
 
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+      recordedAudioBlobRef.current = wavBlob
+
+      // Create WAV file for analysis
+      const wavFile = await blobToWavFile(wavBlob, 'medical_recording.wav');
+      
+      // Create object URL for playback
+      const audioUrl = URL.createObjectURL(wavFile)
+      setRecordedAudioUrl(audioUrl)
+
       // Render the denoised waveform on canvas
-      setCanvasAudioFile(file)
+      setCanvasAudioFile(wavFile)
+
+      // Send the file to the parent component
+      onAudioCaptured(wavFile)
 
     } catch (error) {
       console.error("Error reducing noise:", error)

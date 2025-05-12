@@ -41,38 +41,29 @@ export default function Home() {
     try {
       // Create FormData to send the file
       const formData = new FormData()
-      formData.append("audioFile", file)
-
-      // Log file details for debugging
-      console.log("Analyzing audio file:", file.name, file.type, file.size)
+      formData.append("audio_file", file)
 
       // In a real application, you would send this to your AWS Lambda endpoint
       try {
-        // Simulate API call to AWS Lambda using Axios
-        // const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/predict`, formData, {
-        //   headers: {
-        //     'Accept': 'application/json',
-        //     'Content-Type': 'multipart/form-data',
-        //   },
-        // });
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/predict`, formData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+        });
 
-        // if (response.status !== 200) {
-        //   throw new Error(`Server responded with status: ${response.status}`);
-        // }
+        if (response.status !== 200) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
 
-        // const data = response.data;
+        const data = response.data as ["healthy" | "unhealthy", number];
 
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-
-        // Simulate response
-        // In production, this would come from the actual API
-        const mockResults = {
-          status: Math.random() > 0.5 ? "healthy" : "unhealthy",
-          confidence: Math.floor(70 + Math.random() * 30),
+        const results = {
+          status: data[0],
+          confidence: data[1] * 100,
         } as const
 
-        setResults(mockResults)
+        setResults(results)
         setShowResults(true)
 
         // Reset retry count on success

@@ -10,7 +10,30 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Medical Diagnostic App",
   description: "Record or upload audio for medical diagnosis",
-    generator: 'v0.dev'
+  icons: {
+    icon: "/favicon.ico",
+  },
+  authors: [
+    {
+      name: "Lakindu Banneheka",
+      url: "https://lakindu-banneheka.vercel.app/"
+    }
+  ],
+  keywords: [
+    "medical",
+    "diagnosis",
+    "audio",
+    "recording",
+    "upload",
+    "healthcare",
+    "AI"
+  ],
+  openGraph: {
+    title: "Medical Diagnostic App",
+    description: "Record or upload audio for medical diagnosis",
+    url: "https://medical-diagnostic-app.vercel.app/",
+    siteName: "Medical Diagnostic App",
+  }
 }
 
 export default function RootLayout({
@@ -20,6 +43,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Explicit favicon link */}
+        <link rel="icon" href="/favicon.ico" />
+      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}

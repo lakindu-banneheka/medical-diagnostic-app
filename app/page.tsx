@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 import { useTheme } from "next-themes"
 import axios from "axios"
+import Image from "next/image"
 
 export default function Home() {
   const [audioFile, setAudioFile] = useState<File | null>(null)
@@ -128,7 +129,11 @@ export default function Home() {
       {/* Header with theme toggle */}
       <header className="w-full border-b border-border">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-foreground">Medical Diagnostic</h1>
+          <div className="flex items-center space-x-2">
+            <Image src="./logo/logo-blue.png" alt="Logo" width={36} height={36} />
+            <h1 className="text-xl font-semibold text-foreground">Medical Diagnostic</h1>
+          </div>
+          {/* <h1 className="text-xl font-semibold text-foreground">Medical Diagnostic</h1> */}
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
             {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
@@ -152,7 +157,7 @@ export default function Home() {
                     <Info className="h-5 w-5" />
                   </Button>
                 </div>
-                <CardTitle className="text-2xl font-medium">Respiratory Analysis</CardTitle>
+                <CardTitle className="text-2xl font-medium">Heart Sound Analysis</CardTitle>
                 <CardDescription className="text-primary-foreground/80">
                   Record or upload audio for medical diagnosis
                 </CardDescription>

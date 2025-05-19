@@ -18,7 +18,7 @@ export default function Home() {
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [results, setResults] = useState<{
-    status: "healthy" | "unhealthy"
+    status: "abnormal" | "normal" | "artifact"
     confidence: number
   } | null>(null)
   const [showResults, setShowResults] = useState(false)
@@ -57,12 +57,13 @@ export default function Home() {
           throw new Error(`Server responded with status: ${response.status}`);
         }
 
-        const data = response.data as ["healthy" | "unhealthy", number];
+        const data = response.data as { label: "normal" | "abnormal" | "artifact", confidence: number};
 
         const results = {
-          status: data[0],
-          confidence: data[1] * 100,
+          status: data.label,
+          confidence: data.confidence * 100,
         } as const
+
 
         setResults(results)
         setShowResults(true)

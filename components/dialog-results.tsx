@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 
 interface DialogResultsProps {
   results: {
-    status: "healthy" | "unhealthy"
+    status: "abnormal" | "normal" | "artifact"
     confidence: number
   } | null
   open: boolean
@@ -53,7 +53,30 @@ export function DialogResults({ results, open, onOpenChange }: DialogResultsProp
 
   if (!results) return null
 
-  const isHealthy = results.status === "healthy"
+  if (results.status == "artifact") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+              <span>Artifact Sounds (Not a Heart Sound)</span>
+            </DialogTitle>
+            <DialogDescription>
+              The audio sample contains artifact sounds that are not heart sounds. Please try again with a clearer recording.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+  const isHealthy = results.status === "normal"
   const statusColor = isHealthy ? "bg-green-500" : "bg-destructive"
   const statusBgColor = isHealthy ? "bg-green-500/10" : "bg-destructive/10"
   const statusBorderColor = isHealthy ? "border-green-500" : "border-destructive"
@@ -70,7 +93,7 @@ export function DialogResults({ results, open, onOpenChange }: DialogResultsProp
                 <AlertTriangle className="h-6 w-6 text-destructive" />
               )}
             </div>
-            <span>{isHealthy ? "Healthy" : "Unhealthy"}</span>
+            <span>{isHealthy ? "Normal Heart Sound" : "Abnormal Heart Sound"}</span>
           </DialogTitle>
           <DialogDescription>Diagnostic result with {results.confidence}% confidence</DialogDescription>
         </DialogHeader>
@@ -100,8 +123,8 @@ export function DialogResults({ results, open, onOpenChange }: DialogResultsProp
           >
             <p className="text-sm">
               {isHealthy
-                ? "The audio sample indicates normal respiratory patterns. No concerning sounds detected."
-                : "The audio sample contains patterns that may indicate respiratory abnormalities. Consider consulting a healthcare professional."}
+                ? "The audio sample indicates normal heart sounds. No murmurs detected."
+                : "The audio sample contains abnormal heart sounds, which may indicate cardiac issues. Consider consulting a healthcare professional."}
             </p>
           </div>
 

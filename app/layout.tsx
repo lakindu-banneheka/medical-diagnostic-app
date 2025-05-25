@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   description: "Record or upload audio for medical diagnosis",
   icons: {
     icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon-32x32.png",
+
   },
   authors: [
     {
@@ -44,8 +47,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Explicit favicon link */}
+        {/* Favicons for all environments */}
         <link rel="icon" href="/favicon.ico" />
+        <link rel="shortcut icon" href="/favicon-32x32.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>

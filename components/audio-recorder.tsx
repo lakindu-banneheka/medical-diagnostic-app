@@ -1031,9 +1031,9 @@ export function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
               <canvas ref={canvasRef} height={160} className="w-full h-full" />
 
           {/* Medical grade indicator */}
-          <div className="absolute top-2 right-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
+          {/* <div className="absolute top-2 right-2 bg-background/50 dark:bg-background/70 text-foreground text-xs px-2 py-1 rounded-full">
             Medical-grade
-          </div>
+          </div> */}
 
           {/* Recording time indicator */}
           {isRecording && (

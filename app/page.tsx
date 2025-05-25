@@ -246,15 +246,27 @@ export default function Home() {
                   <h4 className="text-sm font-medium mb-2">Features:</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• High-quality audio recording</li>
-                    <li>• Medical-grade analysis</li>
+                    {/* <li>• Medical-grade analysis</li> */}
                     <li>• Download recordings</li>
                     <li>• Instant results</li>
                   </ul>
                 </div>
               </CardContent>
             </Card>
-
-           
+            
+            <Card
+              className="bg-secondary text-secondary-foreground shadow-sm border border-border"
+              style={{ minHeight: "150px" }}
+            >
+              <CardHeader>
+                <CardTitle className="text-lg">Disclaimer</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  This is an AI prediction for research purposes only. Please consult healthcare professionals for medical advice.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

@@ -166,7 +166,7 @@ export default function Home() {
                 {showInfo && (
                   <div className="mt-2 p-3 bg-primary-foreground/10 rounded-md text-xs">
                     <p>
-                      This application uses medical-grade audio processing to analyze respiratory patterns. For best
+                      This application uses audio processing to analyze respiratory patterns. For best
                       results:
                     </p>
                     <ul className="list-disc pl-4 mt-1 space-y-1">
@@ -240,8 +240,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  This medical diagnostic tool uses advanced audio analysis to detect potential respiratory issues. The
-                  analysis is performed using medical-grade algorithms that evaluate breathing patterns.
+                  This medical diagnostic tool uses advanced audio analysis to detect potential respiratory issues.
                 </p>
                 <div className="mt-4 pt-4 border-t border-border">
                   <h4 className="text-sm font-medium mb-2">Features:</h4>
